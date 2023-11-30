@@ -71,4 +71,19 @@ public class PasswordServiceIml implements PasswordService {
             System.out.println(item);
         }
     }
+
+    @Override
+    public List<PasswordInfo> findSite(String str) {
+        return passwordRepository.findBySite(str);
+    }
+
+    @Override
+    public List<PasswordInfo> findEmail(String email) {
+        return passwordRepository.findByEmail(email);
+    }
+
+    @Override
+    public List<PasswordInfo> findPass(String pass) {
+        return passwordRepository.findByPassword(pass);
+    }
 }
