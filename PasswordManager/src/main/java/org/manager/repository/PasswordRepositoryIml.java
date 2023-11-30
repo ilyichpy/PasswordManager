@@ -1,4 +1,4 @@
-package org.manager.service;
+package org.manager.repository;
 
 import org.manager.models.PasswordInfo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.BeanPropertySqlParameterSource;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -33,7 +34,8 @@ public class PasswordRepositoryIml implements PasswordRepository {
             public PasswordInfo mapRow(ResultSet rs, int rowNum) throws SQLException {
                 return new PasswordInfo(rs.getLong("id"),
                         rs.getString("email"),
-                        rs.getString("password"));
+                        rs.getString("password"),
+                        rs.getString("site"));
             }
         });
     }
@@ -61,26 +63,59 @@ public class PasswordRepositoryIml implements PasswordRepository {
     }
 
     @Override
-    public void update(PasswordInfo element) {
+    public List<PasswordInfo> findBySite(String site) {
+        return dataSource.query("select * from manager.info where site=:site",
+                new MapSqlParameterSource().addValue("site", site),
+                new BeanPropertyRowMapper<>(PasswordInfo.class));
+    }
 
+    @Override
+    public void update(PasswordInfo element) {
+        dataSource.update("update manager.info set email=:email, password=:password, site=:site where id=:id",
+                new MapSqlParameterSource()
+                        .addValue("email", element.getEmail())
+                        .addValue("password", element.getPassword())
+                        .addValue("site", element.getSite())
+                        .addValue("id", element.getId()));
     }
 
     @Override
     public void save(PasswordInfo element) {
         try {
-            dataSource.update("insert into manager.info(id, email, password) values(:id, :email, :password)",
+            List<PasswordInfo> id = dataSource.query("SELECT * FROM manager.info " +
+                    "WHERE id = (SELECT MAX (id) FROM manager.info)", new RowMapper<>() {
+                @Override
+                public PasswordInfo mapRow(ResultSet rs, int rowNum) throws SQLException {
+                    return new PasswordInfo(rs.getLong("id"),
+                            rs.getString("email"),
+                            rs.getString("password"),
+                            rs.getString("site"));
+                }
+            });
+            System.out.println(id.isEmpty());
+            Long maxId;
+            if (id.isEmpty()) {
+                maxId = 0L;
+            } else {
+                maxId = id.get(0).getId();
+            }
+            System.out.println(maxId);
+            dataSource.update("insert into manager.info(id, email, password, site) values(:id, :email, :password, :site)",
                     new MapSqlParameterSource().
-                            addValue("id", element.getId()).
+                            addValue("id", maxId + 1).
                             addValue("email", element.getEmail()).
-                            addValue("password", element.getPassword()));
+                            addValue("password", element.getPassword())
+                            .addValue("site", element.getSite()));
         } catch (DataAccessException e) {
-            System.err.println("this path and email already exists");
+            System.err.println(e + "\n" + "this path and email already exists");
         }
     }
 
 
     @Override
     public void delete(Long id) {
-
+        dataSource.update("delete from manager.info where id=:id",
+                new MapSqlParameterSource()
+                        .addValue("id", id));
     }
 }
